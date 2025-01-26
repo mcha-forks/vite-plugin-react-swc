@@ -27,14 +27,6 @@ const buildOrWatch = async (options: BuildOptions) => {
 
 Promise.all([
   buildOrWatch({
-    entryPoints: ["src/refresh-runtime.js"],
-    outdir: "dist",
-    platform: "browser",
-    format: "esm",
-    target: "safari13",
-    legalComments: "inline",
-  }),
-  buildOrWatch({
     ...serverOptions,
     stdin: {
       contents: `import react from "./src";

@@ -12,10 +12,11 @@ import {
 import { PluginOption, UserConfig, BuildOptions } from "vite";
 import { createRequire } from "module";
 
-const runtimePublicPath = "/@react-refresh";
+const runtimePublicPrefix = "/@vite-prefresh/";
+const prefreshCorePublicPath = runtimePublicPrefix + "core";
+const prefreshUtilsPublicPath = runtimePublicPrefix + "utils";
 
-const preambleCode = `import { injectIntoGlobalHook } from "__PATH__";
-injectIntoGlobalHook(window);
+const preambleCode = `import "__VITE_PREFRESH_CORE__"; import { flush as flushUpdates } from "__VITE_PREFRESH_UTILS__";
 window.$RefreshReg$ = () => {};
 window.$RefreshSig$ = () => (type) => type;`;
 
@@ -65,7 +66,7 @@ const isWebContainer = globalThis.process?.versions?.webcontainer;
 const react = (_options?: Options): PluginOption[] => {
   let hmrDisabled = false;
   const options = {
-    jsxImportSource: _options?.jsxImportSource ?? "react",
+    jsxImportSource: _options?.jsxImportSource ?? "preact",
     tsDecorators: _options?.tsDecorators,
     plugins: _options?.plugins
       ? _options?.plugins.map((el): typeof el => [resolve(el[0]), el[1]])
@@ -78,12 +79,14 @@ const react = (_options?: Options): PluginOption[] => {
     {
       name: "vite:react-swc:resolve-runtime",
       apply: "serve",
-      enforce: "pre", // Run before Vite default resolve to avoid syscalls
-      resolveId: (id) => (id === runtimePublicPath ? id : undefined),
-      load: (id) =>
-        id === runtimePublicPath
-          ? readFileSync(join(_dirname, "refresh-runtime.js"), "utf-8")
-          : undefined,
+      config: () => ({
+        resolve: {
+          alias: {
+            '/@vite-prefresh/core': import.meta.resolve('@prefresh/core'),
+            '/@vite-prefresh/utils': import.meta.resolve('@prefresh/utils'),
+          },
+        }
+      }),
     },
     {
       name: "vite:react-swc",
@@ -120,8 +123,11 @@ const react = (_options?: Options): PluginOption[] => {
           tag: "script",
           attrs: { type: "module" },
           children: preambleCode.replace(
-            "__PATH__",
-            config.server!.config.base + runtimePublicPath.slice(1),
+            "__VITE_PREFRESH_CORE__",
+            config.server!.config.base + prefreshCorePublicPath.slice(1),
+          ).replace(
+            "__VITE_PREFRESH_UTILS__",
+            config.server!.config.base + prefreshUtilsPublicPath.slice(1),
           ),
         },
       ],
@@ -150,7 +156,7 @@ const react = (_options?: Options): PluginOption[] => {
         const sourceMap: SourceMapPayload = JSON.parse(result.map!);
         sourceMap.mappings = ";;" + sourceMap.mappings;
 
-        result.code = `import * as RefreshRuntime from "${runtimePublicPath}";
+        result.code = `import "${prefreshCorePublicPath}"; import { flush as flushUpdates } from "${prefreshUtilsPublicPath}";
 
 ${result.code}`;
 
@@ -159,8 +165,8 @@ ${result.code}`;
           result.code = `if (!window.$RefreshReg$) throw new Error("React refresh preamble was not loaded. Something is wrong.");
 const prevRefreshReg = window.$RefreshReg$;
 const prevRefreshSig = window.$RefreshSig$;
-window.$RefreshReg$ = RefreshRuntime.getRefreshReg("${id}");
-window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+self.$RefreshReg$ = (type, id) => {self.__PREFRESH__.register(type, ${JSON.stringify(id)} + " " + id)};
+self.$RefreshSig$ = () => {let status = 'begin'; let savedType; return (type, key, forceReset, getCustomHooks) => { if (!savedType) savedType = type; status = self.__PREFRESH__.sign(type || savedType, key, forceReset, getCustomHooks, status); return type; }};
 
 ${result.code}
 
@@ -170,13 +176,12 @@ window.$RefreshSig$ = prevRefreshSig;
         }
 
         result.code += `
-RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
-  RefreshRuntime.registerExportsForReactRefresh("${id}", currentExports);
-  import.meta.hot.accept((nextExports) => {
-    if (!nextExports) return;
-    const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("${id}", currentExports, nextExports);
-    if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
-  });
+import.meta.hot.accept((m) => {
+  try {
+    flushUpdates();
+  } catch (e) {
+    self.location.reload();
+  }
 });
 `;
 

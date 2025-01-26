@@ -17,7 +17,9 @@
     "@swc/core": "^1.7.26"
   },
   "peerDependencies": {
-    "vite": "^4 || ^5 || ^6"
+    "vite": "^4 || ^5 || ^6",
+    "@prefresh/core": "^1.5.3",
+    "@prefresh/utils": "^1.2.0"
   },
   "devDependencies": {
     "@arnaud-barre/tnode": "^0.19.2",
