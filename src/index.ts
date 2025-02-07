@@ -69,7 +69,7 @@ const react = (_options?: Options): PluginOption[] => {
     jsxImportSource: _options?.jsxImportSource ?? "preact",
     tsDecorators: _options?.tsDecorators,
     plugins: _options?.plugins
-      ? _options?.plugins.map((el): typeof el => [resolve(el[0]), el[1]])
+      ? _options?.plugins.map((el): typeof el => [el[0], el[1]])
       : undefined,
     devTarget: _options?.devTarget ?? "es2020",
     parserConfig: _options?.parserConfig,
